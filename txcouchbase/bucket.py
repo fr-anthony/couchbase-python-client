@@ -18,9 +18,7 @@
 This file contains the twisted-specific bits for the Couchbase client.
 """
 
-from twisted.internet import reactor
 from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
 
 from couchbase.async.bucket import AsyncBucket
 from couchbase.async.view import AsyncViewBase
@@ -102,8 +100,12 @@ class TxEventQueue(EventQueue):
     Subclass of EventQueue. This implements the relevant firing methods,
     treating an 'Event' as a 'Deferred'
     """
+    def __init__(self, reactor=None):
+        if reactor is None:
+            from twisted.internet import reactor
+        self.reactor = reactor
     def fire_async(self, event):
-        reactor.callLater(0, event.callback, None)
+        self.reactor.callLater(0, event.callback, None)
 
     def call_single_success(self, event, *args, **kwargs):
         event.callback(None)
@@ -121,19 +123,21 @@ class ConnectionEventQueue(TxEventQueue):
         raise err
 
 class RawBucket(AsyncBucket):
-    def __init__(self, connstr=None, **kwargs):
+    def __init__(self, connstr=None, reactor=None, **kwargs):
         """
         Bucket subclass for Twisted. This inherits from the 'AsyncBucket' class,
         but also adds some twisted-specific logic for hooking on a connection.
         """
         if connstr and 'connstr' not in kwargs:
             kwargs['connstr'] = connstr
+        if reactor is None:
+            from twisted.internet import reactor
         iops = v0Iops(reactor)
         super(RawBucket, self).__init__(iops=iops, **kwargs)
 
         self._evq = {
             'connect': ConnectionEventQueue(),
-            '_dtor': TxEventQueue()
+            '_dtor': TxEventQueue(reactor)
         }
 
         self._conncb = self._evq['connect']
