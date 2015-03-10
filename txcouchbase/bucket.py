@@ -136,7 +136,7 @@ class RawBucket(AsyncBucket):
         super(RawBucket, self).__init__(iops=iops, **kwargs)
 
         self._evq = {
-            'connect': ConnectionEventQueue(),
+            'connect': ConnectionEventQueue(reactor),
             '_dtor': TxEventQueue(reactor)
         }
 
